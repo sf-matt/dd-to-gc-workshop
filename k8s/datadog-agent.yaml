@@ -1,0 +1,39 @@
+# Deployed via the Datadog Operator into the `datadog` namespace — kept separate
+# from `workshop` because Single Step Instrumentation does not instrument the
+# namespace the Agent itself runs in.
+apiVersion: datadoghq.com/v2alpha1
+kind: DatadogAgent
+metadata:
+  name: datadog
+  namespace: datadog
+spec:
+  global:
+    site: us3.datadoghq.com
+    clusterName: workshop-local
+    kubelet:
+      # Dev-only workaround for Kind/local clusters without a trusted
+      # kubelet CA. Replace with proper CA trust before production.
+      tlsVerify: false
+  override:
+    nodeAgent:
+      env:
+        # Kind has no cloud-provider metadata, so hostname auto-detection
+        # fails without this.
+        - name: DD_HOSTNAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+  features:
+    apm:
+      instrumentation:
+        enabled: true
+        targets:
+          - name: "workshop-namespace"
+            namespaceSelector:
+              matchNames:
+                - workshop
+            ddTraceVersions:
+              python: default
+    logCollection:
+      enabled: true
+      containerCollectAll: true

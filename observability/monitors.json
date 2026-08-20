@@ -1,0 +1,70 @@
+[
+  {
+    "name": "[Workshop] payment-svc high error rate",
+    "type": "metric alert",
+    "query": "sum(last_5m):( sum:trace.http.request.errors{service:payment-svc,env:workshop}.as_count() / sum:trace.http.request.hits{service:payment-svc,env:workshop}.as_count() ) * 100 > 10",
+    "message": "payment-svc error rate is above 10% over the last 5 minutes. This is the monitor you'll rebuild in groundcover to confirm parity.\n\n{{#is_alert}}Error rate: {{value}}%{{/is_alert}}\n\n@slack-workshop-alerts",
+    "tags": ["workshop:dd-to-gc", "service:payment-svc", "team:demo"],
+    "options": {
+      "thresholds": { "critical": 10, "warning": 5 },
+      "notify_no_data": false,
+      "renotify_interval": 0,
+      "evaluation_delay": 60
+    },
+    "priority": 2
+  },
+  {
+    "name": "[Workshop] payment-svc high p95 latency",
+    "type": "metric alert",
+    "query": "avg(last_5m):p95:trace.http.request.duration{service:payment-svc,env:workshop} > 0.5",
+    "message": "payment-svc p95 latency has exceeded 500ms for 5 minutes. Likely triggered by the chaos-mode latency injection during the workshop demo.\n\n{{#is_alert}}p95 latency: {{value}}s{{/is_alert}}\n\n@slack-workshop-alerts",
+    "tags": ["workshop:dd-to-gc", "service:payment-svc", "team:demo"],
+    "options": {
+      "thresholds": { "critical": 0.5, "warning": 0.3 },
+      "notify_no_data": false,
+      "renotify_interval": 0,
+      "evaluation_delay": 60
+    },
+    "priority": 2
+  },
+  {
+    "name": "[Workshop] payment-svc no traffic / service down",
+    "type": "metric alert",
+    "query": "sum(last_10m):sum:trace.http.request.hits{service:payment-svc,env:workshop}.as_count() <= 0",
+    "message": "payment-svc has received zero requests in the last 10 minutes — the service may be down, or the load-generator has stopped.\n\n@slack-workshop-alerts",
+    "tags": ["workshop:dd-to-gc", "service:payment-svc", "team:demo"],
+    "options": {
+      "thresholds": { "critical": 0 },
+      "notify_no_data": true,
+      "no_data_timeframe": 10,
+      "renotify_interval": 0
+    },
+    "priority": 1
+  },
+  {
+    "name": "[Workshop] payment-svc pod restarts detected",
+    "type": "metric alert",
+    "query": "max(last_5m):max:kubernetes.containers.restarts{kube_deployment:payment-svc,kube_namespace:workshop} > 0",
+    "message": "A payment-svc pod has restarted. Check for CrashLoopBackOff or OOMKilled events.\n\n@slack-workshop-alerts",
+    "tags": ["workshop:dd-to-gc", "service:payment-svc", "team:demo"],
+    "options": {
+      "thresholds": { "critical": 0 },
+      "notify_no_data": false,
+      "renotify_interval": 0
+    },
+    "priority": 2
+  },
+  {
+    "name": "[Workshop] payment-svc memory approaching limit",
+    "type": "metric alert",
+    "query": "avg(last_5m):( avg:kubernetes.memory.usage{kube_deployment:payment-svc,kube_namespace:workshop} / avg:kubernetes.memory.limit{kube_deployment:payment-svc,kube_namespace:workshop} ) * 100 > 90",
+    "message": "payment-svc memory usage is above 90% of its configured limit — at risk of OOMKill.\n\n@slack-workshop-alerts",
+    "tags": ["workshop:dd-to-gc", "service:payment-svc", "team:demo"],
+    "options": {
+      "thresholds": { "critical": 90, "warning": 75 },
+      "notify_no_data": false,
+      "renotify_interval": 0
+    },
+    "priority": 3
+  }
+]

@@ -1,0 +1,7 @@
+# Explicit config so every attendee gets an identically-named, single-node
+# cluster — avoids "which cluster context am I in" confusion mid-workshop.
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+name: workshop
+nodes:
+  - role: control-plane

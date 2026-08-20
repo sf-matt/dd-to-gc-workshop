@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: workshop
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: datadog

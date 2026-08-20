@@ -1,0 +1,53 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: payment-svc
+  namespace: workshop
+  labels:
+    app: payment-svc
+    tags.datadoghq.com/env: "workshop"
+    tags.datadoghq.com/service: "payment-svc"
+    tags.datadoghq.com/version: "1.0.0"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: payment-svc
+  template:
+    metadata:
+      labels:
+        app: payment-svc
+        tags.datadoghq.com/env: "workshop"
+        tags.datadoghq.com/service: "payment-svc"
+        tags.datadoghq.com/version: "1.0.0"
+    spec:
+      containers:
+        - name: payment-svc
+          image: payment-svc:local
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 5000
+          env:
+            - name: CHAOS_LATENCY_MS
+              value: "0"
+            - name: CHAOS_ERROR_RATE
+              value: "0.0"
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 250m
+              memory: 128Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: payment-svc
+  namespace: workshop
+spec:
+  selector:
+    app: payment-svc
+  ports:
+    - port: 5000
+      targetPort: 5000

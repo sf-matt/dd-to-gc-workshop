@@ -1,0 +1,32 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: load-generator
+  namespace: workshop
+  labels:
+    app: load-generator
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: load-generator
+  template:
+    metadata:
+      labels:
+        app: load-generator
+    spec:
+      containers:
+        - name: load-generator
+          image: curlimages/curl:8.9.1
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              while true; do
+                curl -s -o /dev/null -X POST http://order-api:5000/order \
+                  -H 'Content-Type: application/json' -d '{}';
+                sleep 1;
+              done
+          resources:
+            requests:
+              cpu: 10m
+              memory: 16Mi

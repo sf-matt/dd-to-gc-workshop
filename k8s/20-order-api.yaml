@@ -1,0 +1,51 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: order-api
+  namespace: workshop
+  labels:
+    app: order-api
+    tags.datadoghq.com/env: "workshop"
+    tags.datadoghq.com/service: "order-api"
+    tags.datadoghq.com/version: "1.0.0"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: order-api
+  template:
+    metadata:
+      labels:
+        app: order-api
+        tags.datadoghq.com/env: "workshop"
+        tags.datadoghq.com/service: "order-api"
+        tags.datadoghq.com/version: "1.0.0"
+    spec:
+      containers:
+        - name: order-api
+          image: order-api:local
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 5000
+          env:
+            - name: PAYMENT_SVC_URL
+              value: "http://payment-svc:5000"
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 250m
+              memory: 128Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: order-api
+  namespace: workshop
+spec:
+  selector:
+    app: order-api
+  ports:
+    - port: 5000
+      targetPort: 5000

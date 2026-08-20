@@ -1,0 +1,184 @@
+{
+  "title": "DD→GC Workshop: Order Flow Service Health",
+  "description": "Unified view of order-api and payment-svc. Built from APM (Single Step Instrumentation), infra/container metrics (Datadog Agent), and container logs. This is the dashboard attendees will rebuild in groundcover for parity.",
+  "layout_type": "ordered",
+  "template_variables": [
+    { "name": "env", "prefix": "env", "available_values": ["workshop"], "default": "workshop" },
+    { "name": "namespace", "prefix": "kube_namespace", "available_values": ["workshop"], "default": "workshop" }
+  ],
+  "widgets": [
+    {
+      "definition": {
+        "type": "group",
+        "title": "Service Overview (APM)",
+        "layout_type": "ordered",
+        "widgets": [
+          {
+            "definition": {
+              "type": "trace_service",
+              "title": "order-api",
+              "env": "$env",
+              "service": "order-api",
+              "span_name": "flask.request",
+              "show_hits": true,
+              "show_errors": true,
+              "show_latency": true,
+              "show_breakdown": false,
+              "show_distribution": false,
+              "show_resource_list": true,
+              "size_format": "large",
+              "display_format": "three_column",
+              "title_size": "16",
+              "title_align": "left"
+            }
+          },
+          {
+            "definition": {
+              "type": "trace_service",
+              "title": "payment-svc",
+              "env": "$env",
+              "service": "payment-svc",
+              "span_name": "flask.request",
+              "show_hits": true,
+              "show_errors": true,
+              "show_latency": true,
+              "show_breakdown": false,
+              "show_distribution": false,
+              "show_resource_list": true,
+              "size_format": "large",
+              "display_format": "three_column",
+              "title_size": "16",
+              "title_align": "left"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "definition": {
+        "type": "group",
+        "title": "Latency & Errors",
+        "layout_type": "ordered",
+        "widgets": [
+          {
+            "definition": {
+              "type": "timeseries",
+              "title": "payment-svc Latency (p50 / p95 / p99)",
+              "requests": [
+                {
+                  "queries": [
+                    { "data_source": "metrics", "name": "p50", "query": "p50:trace.http.request.duration{service:payment-svc,env:$env}" },
+                    { "data_source": "metrics", "name": "p95", "query": "p95:trace.http.request.duration{service:payment-svc,env:$env}" },
+                    { "data_source": "metrics", "name": "p99", "query": "p99:trace.http.request.duration{service:payment-svc,env:$env}" }
+                  ],
+                  "response_format": "timeseries",
+                  "display_type": "line"
+                }
+              ],
+              "yaxis": { "scale": "linear", "label": "seconds" }
+            }
+          },
+          {
+            "definition": {
+              "type": "timeseries",
+              "title": "Error Rate % by Service",
+              "requests": [
+                {
+                  "formulas": [{ "formula": "(errors / hits) * 100", "alias": "error rate %" }],
+                  "queries": [
+                    { "data_source": "metrics", "name": "hits", "query": "sum:trace.http.request.hits{env:$env} by {service}.as_count()" },
+                    { "data_source": "metrics", "name": "errors", "query": "sum:trace.http.request.errors{env:$env} by {service}.as_count()" }
+                  ],
+                  "response_format": "timeseries",
+                  "display_type": "line"
+                }
+              ],
+              "yaxis": { "scale": "linear", "label": "%" }
+            }
+          },
+          {
+            "definition": {
+              "type": "toplist",
+              "title": "Top Endpoints by Error Count",
+              "requests": [
+                {
+                  "queries": [
+                    { "data_source": "metrics", "name": "query1", "query": "sum:trace.http.request.errors{env:$env} by {resource_name}.as_count()" }
+                  ],
+                  "response_format": "scalar"
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "definition": {
+        "type": "group",
+        "title": "Infra & Kubernetes",
+        "layout_type": "ordered",
+        "widgets": [
+          {
+            "definition": {
+              "type": "timeseries",
+              "title": "Pod CPU Usage",
+              "requests": [
+                {
+                  "queries": [
+                    { "data_source": "metrics", "name": "query1", "query": "avg:kubernetes.cpu.usage.total{$namespace} by {pod_name}" }
+                  ],
+                  "response_format": "timeseries",
+                  "display_type": "line"
+                }
+              ]
+            }
+          },
+          {
+            "definition": {
+              "type": "timeseries",
+              "title": "Pod Memory Usage",
+              "requests": [
+                {
+                  "queries": [
+                    { "data_source": "metrics", "name": "query1", "query": "avg:kubernetes.memory.usage{$namespace} by {pod_name}" }
+                  ],
+                  "response_format": "timeseries",
+                  "display_type": "line"
+                }
+              ]
+            }
+          },
+          {
+            "definition": {
+              "type": "query_value",
+              "title": "Pod Restarts (last 1h)",
+              "requests": [
+                {
+                  "queries": [
+                    { "data_source": "metrics", "name": "query1", "query": "max:kubernetes.containers.restarts{$namespace}" }
+                  ],
+                  "response_format": "scalar"
+                }
+              ],
+              "autoscale": true,
+              "precision": 0
+            }
+          }
+        ]
+      }
+    },
+    {
+      "definition": {
+        "type": "log_stream",
+        "title": "payment-svc Error Logs",
+        "query": "service:payment-svc status:error",
+        "columns": ["core_host", "core_service", "tag_source"],
+        "show_date_column": true,
+        "show_message_column": true,
+        "message_display": "expanded-md",
+        "sort": { "column": "time", "order": "desc" }
+      }
+    }
+  ]
+}
