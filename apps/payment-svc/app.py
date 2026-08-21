@@ -6,8 +6,6 @@ from flask import Flask, jsonify, request
 
 app = Flask(__name__)
 
-# In-memory chaos state — toggled live during the workshop via POST /chaos.
-# Single replica, so this is intentionally not persisted anywhere.
 chaos_state = {
     "latency_ms": int(os.getenv("CHAOS_LATENCY_MS", "0")),
     "error_rate": float(os.getenv("CHAOS_ERROR_RATE", "0.0")),

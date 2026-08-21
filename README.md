@@ -18,9 +18,12 @@ k8s/
   20-order-api.yaml
   30-load-generator.yaml  # constant traffic generator, no custom image needed
   datadog-agent.yaml      # DatadogAgent CR: hostname fix, kubelet TLS fix, SSI
+  provision-student.sh    # renders per-student, env-tagged copies of the app manifests
 observability/
-  dashboard.json          # import into Datadog
-  monitors.json           # import into Datadog
+  dashboards/*.json       # 5 standalone dashboards, import into Datadog
+  monitors.json           # 9 monitors, import into Datadog
+  log-pipeline.json       # log processing pipeline (HTTP status -> log severity)
+  provision-student.sh    # renders + imports a per-student copy of the above
   README.md               # what backs each widget/monitor, and why
 ```
 
@@ -36,9 +39,34 @@ observability/
 - **`load-generator` needs no build.** It's `curlimages/curl` with a shell
   loop in the manifest — one less image to maintain.
 
+## Prerequisites
+
+- [Docker Desktop](https://www.docker.com/products/docker-desktop/) (or another
+  local Docker daemon), running
+- `kind`, `kubectl`, `helm`, `jq`
+
+On macOS with Homebrew, one line covers the CLIs (Docker Desktop still needs
+its own install):
+
+```bash
+brew install kind kubectl helm jq
+```
+
+Check everything's in place before starting:
+
+```bash
+command -v kind kubectl helm jq >/dev/null && echo "CLIs ok" || echo "missing a CLI — see above"
+docker info >/dev/null 2>&1 && echo "docker ok" || echo "docker not running"
+```
+
 ## Quick start (local / Kind)
 
 ```bash
+# Datadog credentials: copy .env.example to .env, fill in DD_API_KEY /
+# DD_APP_KEY, then source it before any of the steps below.
+cp .env.example .env   # edit with your keys
+source .env
+
 kind create cluster --config kind-config.yaml
 
 # Build images normally, then load them into the Kind cluster
@@ -50,10 +78,21 @@ kind load docker-image payment-svc:local --name workshop
 # Namespaces
 kubectl apply -f k8s/00-namespace.yaml
 
-# Datadog Operator + Agent (adjust to however you already install the Operator)
+# Datadog Operator + Agent
+helm repo add datadog https://helm.datadoghq.com
+helm repo update datadog
+helm install datadog-operator datadog/datadog-operator -n datadog
 kubectl create secret generic datadog-secret \
-  --from-literal api-key=<YOUR_DD_API_KEY> -n datadog
+  --from-literal api-key="$DD_API_KEY" -n datadog
 kubectl apply -f k8s/datadog-agent.yaml
+
+# Wait for the cluster-agent (runs the admission webhook that injects Single
+# Step Instrumentation) before creating app pods — pods created before the
+# webhook is live never get instrumented. If you ever do apply app manifests
+# too early, `kubectl rollout restart deployment/order-api deployment/payment-svc
+# -n workshop` re-creates the pods and picks up instrumentation.
+kubectl wait --for=condition=available --timeout=180s \
+  deployment/datadog-cluster-agent -n datadog
 
 # App
 kubectl apply -f k8s/10-payment-svc.yaml

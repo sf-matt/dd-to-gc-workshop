@@ -1,3 +1,4 @@
 .env
 observability/.provisioned/
 k8s/.provisioned/
+__pycache__/
