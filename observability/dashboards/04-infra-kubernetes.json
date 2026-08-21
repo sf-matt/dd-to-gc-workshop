@@ -1,0 +1,57 @@
+{
+  "title": "DD→GC Workshop: 4. Infra & Kubernetes",
+  "description": "Pod-level CPU, memory, and restart signal from the Datadog Agent's kubelet integration — independent of APM, so this keeps working even for services with no tracing at all.",
+  "layout_type": "ordered",
+  "template_variables": [
+    { "name": "namespace", "prefix": "kube_namespace", "available_values": ["workshop"], "default": "workshop" },
+    { "name": "env", "prefix": "env", "available_values": ["workshop"], "default": "workshop" }
+  ],
+  "widgets": [
+    {
+      "definition": {
+        "type": "timeseries",
+        "title": "Pod CPU Usage",
+        "requests": [
+          {
+            "queries": [
+              { "data_source": "metrics", "name": "query1", "query": "avg:kubernetes.cpu.usage.total{$namespace,$env} by {pod_name}" }
+            ],
+            "response_format": "timeseries",
+            "display_type": "line"
+          }
+        ]
+      }
+    },
+    {
+      "definition": {
+        "type": "timeseries",
+        "title": "Pod Memory Usage",
+        "requests": [
+          {
+            "queries": [
+              { "data_source": "metrics", "name": "query1", "query": "avg:kubernetes.memory.usage{$namespace,$env} by {pod_name}" }
+            ],
+            "response_format": "timeseries",
+            "display_type": "line"
+          }
+        ]
+      }
+    },
+    {
+      "definition": {
+        "type": "query_value",
+        "title": "Pod Restarts (last 1h)",
+        "requests": [
+          {
+            "queries": [
+              { "data_source": "metrics", "name": "query1", "query": "max:kubernetes.containers.restarts{$namespace,$env}" }
+            ],
+            "response_format": "scalar"
+          }
+        ],
+        "autoscale": true,
+        "precision": 0
+      }
+    }
+  ]
+}

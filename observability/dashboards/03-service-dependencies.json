@@ -1,0 +1,62 @@
+{
+  "title": "DD→GC Workshop: 3. Service Dependencies",
+  "description": "order-api's outbound call to payment-svc, isolated via the APM client-span metric (trace.requests.request.*, tagged peer.service:payment-svc) — separate from order-api's own request handling. This is the same dependency signal groundcover's eBPF sensor derives without any admission controller.",
+  "layout_type": "ordered",
+  "template_variables": [
+    { "name": "env", "prefix": "env", "available_values": ["workshop"], "default": "workshop" }
+  ],
+  "widgets": [
+    {
+      "definition": {
+        "type": "timeseries",
+        "title": "order-api → payment-svc Call Latency (p50 / p95 / p99)",
+        "requests": [
+          {
+            "queries": [
+              { "data_source": "metrics", "name": "p50", "query": "p50:trace.requests.request{service:order-api,peer.service:payment-svc,env:$env}" },
+              { "data_source": "metrics", "name": "p95", "query": "p95:trace.requests.request{service:order-api,peer.service:payment-svc,env:$env}" },
+              { "data_source": "metrics", "name": "p99", "query": "p99:trace.requests.request{service:order-api,peer.service:payment-svc,env:$env}" }
+            ],
+            "response_format": "timeseries",
+            "display_type": "line"
+          }
+        ],
+        "yaxis": { "scale": "linear", "label": "seconds" }
+      }
+    },
+    {
+      "definition": {
+        "type": "timeseries",
+        "title": "order-api → payment-svc Downstream Error Rate %",
+        "requests": [
+          {
+            "formulas": [{ "formula": "(errors / hits) * 100", "alias": "dependency error rate %" }],
+            "queries": [
+              { "data_source": "metrics", "name": "hits", "query": "sum:trace.requests.request.hits{service:order-api,peer.service:payment-svc,env:$env}.as_count()" },
+              { "data_source": "metrics", "name": "errors", "query": "sum:trace.requests.request.hits.by_http_status{service:order-api,peer.service:payment-svc,env:$env,http.status_class:5xx}.as_count()" }
+            ],
+            "response_format": "timeseries",
+            "display_type": "line"
+          }
+        ],
+        "yaxis": { "scale": "linear", "label": "%" }
+      }
+    },
+    {
+      "definition": {
+        "type": "query_value",
+        "title": "order-api → payment-svc Call Volume (last 1h)",
+        "requests": [
+          {
+            "queries": [
+              { "data_source": "metrics", "name": "query1", "query": "sum:trace.requests.request.hits{service:order-api,peer.service:payment-svc,env:$env}.as_count()" }
+            ],
+            "response_format": "scalar"
+          }
+        ],
+        "autoscale": true,
+        "precision": 0
+      }
+    }
+  ]
+}

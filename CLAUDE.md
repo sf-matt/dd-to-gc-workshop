@@ -15,10 +15,17 @@ not in-app).
 - `k8s/` — manifests for Kind. `workshop` namespace for the app,
   `datadog` namespace for the Agent (kept separate — Single Step
   Instrumentation doesn't instrument the Agent's own namespace)
-- `observability/dashboard.json` + `observability/monitors.json` — Datadog
-  dashboard/monitor definitions, importable via API or UI. These are the
-  "before" state that gets rebuilt in groundcover during the workshop's
-  migration half.
+- `observability/dashboards/*.json` (5 standalone dashboards) +
+  `observability/monitors.json` + `observability/log-pipeline.json` — Datadog
+  dashboard/monitor/log-pipeline definitions, importable via API or UI. These
+  are the "before" state that gets rebuilt in groundcover during the
+  workshop's migration half.
+- `k8s/provision-student.sh` + `observability/provision-student.sh` — for
+  running this workshop with many students inside one shared Datadog org.
+  Both derive an `env:workshop-<name>` tag from the same student name, one
+  scoping the app manifests' `tags.datadoghq.com/env` label, the other
+  scoping a per-student copy of every dashboard/monitor. Keep them in sync if
+  the env-tagging convention ever changes on either side.
 
 ## Conventions to preserve when iterating
 

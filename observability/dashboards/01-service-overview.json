@@ -1,0 +1,48 @@
+{
+  "title": "DD→GC Workshop: 1. Service Overview",
+  "description": "APM built-in service widgets for order-api and payment-svc (trace_service type — no hand-rolled query risk). Start here: this is the first thing to rebuild in groundcover for parity.",
+  "layout_type": "ordered",
+  "template_variables": [
+    { "name": "env", "prefix": "env", "available_values": ["workshop"], "default": "workshop" }
+  ],
+  "widgets": [
+    {
+      "definition": {
+        "type": "trace_service",
+        "title": "order-api",
+        "env": "$env",
+        "service": "order-api",
+        "span_name": "flask.request",
+        "show_hits": true,
+        "show_errors": true,
+        "show_latency": true,
+        "show_breakdown": false,
+        "show_distribution": false,
+        "show_resource_list": true,
+        "size_format": "large",
+        "display_format": "three_column",
+        "title_size": "16",
+        "title_align": "left"
+      }
+    },
+    {
+      "definition": {
+        "type": "trace_service",
+        "title": "payment-svc",
+        "env": "$env",
+        "service": "payment-svc",
+        "span_name": "flask.request",
+        "show_hits": true,
+        "show_errors": true,
+        "show_latency": true,
+        "show_breakdown": false,
+        "show_distribution": false,
+        "show_resource_list": true,
+        "size_format": "large",
+        "display_format": "three_column",
+        "title_size": "16",
+        "title_align": "left"
+      }
+    }
+  ]
+}

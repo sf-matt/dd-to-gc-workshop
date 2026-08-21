@@ -1,0 +1,3 @@
+.env
+observability/.provisioned/
+k8s/.provisioned/

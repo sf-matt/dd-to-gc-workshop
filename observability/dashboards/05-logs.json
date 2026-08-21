@@ -1,0 +1,56 @@
+{
+  "title": "DD→GC Workshop: 5. Logs",
+  "description": "Container logs from order-api and payment-svc (Datadog Agent log collection, containerCollectAll). Depends on the 'workshop-access-log-status' log pipeline (see observability/README.md) to remap real HTTP status codes onto log severity — without it, every werkzeug access log line lands as status:error regardless of the actual response code, since Flask's dev server writes access logs to stderr.",
+  "layout_type": "ordered",
+  "template_variables": [
+    { "name": "env", "prefix": "env", "available_values": ["workshop"], "default": "workshop" }
+  ],
+  "widgets": [
+    {
+      "definition": {
+        "type": "note",
+        "content": "**Read before trusting `status:error` here:** Flask's built-in dev server writes its access log (every request, any status code) to stderr, and the Datadog Agent defaults stderr lines to `status:error`. The `workshop-access-log-status` pipeline (provisioned alongside this dashboard) remaps severity from the real HTTP status code in the message — but only for logs ingested *after* the pipeline was created. If this dashboard still looks like 100% error rate, the pipeline hasn't caught up yet or wasn't imported; check `observability/README.md`.",
+        "background_color": "yellow",
+        "font_size": "14",
+        "text_align": "left",
+        "show_tick": false
+      }
+    },
+    {
+      "definition": {
+        "type": "log_stream",
+        "title": "order-api Error Logs",
+        "query": "service:order-api env:$env status:error",
+        "columns": ["core_host", "core_service", "tag_source"],
+        "show_date_column": true,
+        "show_message_column": true,
+        "message_display": "expanded-md",
+        "sort": { "column": "time", "order": "desc" }
+      }
+    },
+    {
+      "definition": {
+        "type": "log_stream",
+        "title": "payment-svc Error Logs",
+        "query": "service:payment-svc env:$env status:error",
+        "columns": ["core_host", "core_service", "tag_source"],
+        "show_date_column": true,
+        "show_message_column": true,
+        "message_display": "expanded-md",
+        "sort": { "column": "time", "order": "desc" }
+      }
+    },
+    {
+      "definition": {
+        "type": "log_stream",
+        "title": "order-api + payment-svc — All Recent Requests",
+        "query": "service:(order-api OR payment-svc) env:$env",
+        "columns": ["core_host", "core_service", "tag_source"],
+        "show_date_column": true,
+        "show_message_column": true,
+        "message_display": "expanded-md",
+        "sort": { "column": "time", "order": "desc" }
+      }
+    }
+  ]
+}

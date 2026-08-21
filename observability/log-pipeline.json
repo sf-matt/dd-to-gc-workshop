@@ -1,0 +1,40 @@
+{
+  "name": "workshop-access-log-status",
+  "is_enabled": true,
+  "filter": {
+    "query": "service:(order-api OR payment-svc)"
+  },
+  "processors": [
+    {
+      "type": "grok-parser",
+      "name": "Parse werkzeug access log line",
+      "is_enabled": true,
+      "source": "message",
+      "samples": [
+        "10.244.0.7 - - [21/Aug/2026 17:46:14] \"POST /order HTTP/1.1\" 200 -",
+        "10.244.0.11 - - [21/Aug/2026 17:46:13] \"POST /charge HTTP/1.1\" 500 -"
+      ],
+      "grok": {
+        "support_rules": "",
+        "match_rules": "werkzeug_access %{ip:client.ip} - - \\[%{data:access_time}\\] \"%{word:http.method} %{notSpace:http.url} HTTP/%{notSpace:http.version}\" %{integer:http.status_code} %{notSpace:network.bytes_written}"
+      }
+    },
+    {
+      "type": "category-processor",
+      "name": "Bucket by HTTP status code",
+      "is_enabled": true,
+      "target": "status_category",
+      "categories": [
+        { "name": "error", "filter": { "query": "@http.status_code:>=500" } },
+        { "name": "warning", "filter": { "query": "@http.status_code:[400 TO 499]" } },
+        { "name": "info", "filter": { "query": "@http.status_code:[100 TO 399]" } }
+      ]
+    },
+    {
+      "type": "status-remapper",
+      "name": "Remap log status from HTTP status category",
+      "is_enabled": true,
+      "sources": ["status_category"]
+    }
+  ]
+}
