@@ -37,6 +37,18 @@ cp .env.example .env
 source .env
 ```
 
+**If your site isn't `datadoghq.com` (us1)**, also update `k8s/datadog-agent.yaml` —
+`spec.global.site` is a separate, hardcoded value the Agent itself uses, independent of
+`DD_SITE` in `.env`. Getting these two out of sync is a real trap: the Agent authenticates
+fine (right API key) but silently can't deliver anything (wrong site), and the failure
+mode is a 403 on every intake endpoint that just looks like an auth problem. `.env`'s
+`DD_SITE` only affects the `curl` commands in this file; it does nothing for the Agent.
+
+```bash
+sed -i '' "s/site: .*/site: ${DD_SITE}/" k8s/datadog-agent.yaml   # macOS
+# sed -i "s/site: .*/site: ${DD_SITE}/" k8s/datadog-agent.yaml    # Linux
+```
+
 **3. Stand up the cluster and app:**
 
 ```bash

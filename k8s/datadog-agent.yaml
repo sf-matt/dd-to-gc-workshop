@@ -9,7 +9,7 @@ spec:
       apiSecret:
         secretName: datadog-secret
         keyName: api-key
-    site: us3.datadoghq.com
+    site: datadoghq.com
     clusterName: workshop-local
     kubelet:
       # Dev-only workaround for Kind/local clusters without a trusted
