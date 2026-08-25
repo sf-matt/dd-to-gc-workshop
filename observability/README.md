@@ -98,18 +98,37 @@ cd ..
 **Done.** Give it a couple of minutes, then check **APM > Traces** in your Datadog org
 for `order-api` and `payment-svc` — you should see live traffic from `load-generator`.
 
-**One thing you'll probably see that isn't from this repo:** a fresh trial org
-auto-generates its own **Recommended Monitors** the moment Datadog notices your
-Kubernetes/APM integration data — 15-20 of them, named things like `[Kubernetes] Pod
-{{pod_name.name}} is CrashloopBackOff...` or `CPU usage is high for host {{host.name}}`,
-created by `Datadog Support`, tagged `monitor_pack:kubernetes`/`monitor_pack:host`/
-`monitor_pack:apm`. That's Datadog's own onboarding behavior, not this workshop's
-`monitors.json` — you can tell them apart by that `creator`/`monitor_pack` tag, or just
-by name (this repo's are all prefixed `[Workshop]`). The `{{...}}` in their titles isn't
-broken; it's the same multi-alert templating this repo's own monitors use, resolving to
-a real pod/host name only once that specific one fires. Harmless to leave, or delete
-them (**Monitors > search `monitor_pack:*` > Delete**) if you want a clean, workshop-only
-view before you start comparing against groundcover.
+### 5. (Optional but recommended) Clean up Datadog's auto-generated monitors
+
+A fresh trial org auto-generates its own **Recommended Monitors** the moment Datadog
+notices your Kubernetes/APM integration data — 15-20 of them, appearing progressively
+over the following few minutes as each integration gets detected, named things like
+`[Kubernetes] Pod {{pod_name.name}} is CrashloopBackOff...` or `CPU usage is high for
+host {{host.name}}`, created by `Datadog Support`, tagged `monitor_pack:kubernetes`/
+`monitor_pack:host`/`monitor_pack:apm`. That's Datadog's own onboarding behavior, not
+this workshop's `monitors.json` — you can tell them apart by that `creator`/
+`monitor_pack` tag, or just by name (this repo's are all prefixed `[Workshop]`). The
+`{{...}}` in their titles isn't broken; it's the same multi-alert templating this
+repo's own monitors use, resolving to a real pod/host name only once that specific one
+fires.
+
+They're harmless to leave. If you want only this workshop's monitors — e.g. before
+comparing against groundcover, so the two sides show the same set — wait a few minutes
+after step 4 for them to finish appearing, then:
+
+```bash
+curl -s "https://api.${DD_SITE}/api/v1/monitor" \
+  -H "DD-API-KEY: ${DD_API_KEY}" -H "DD-APPLICATION-KEY: ${DD_APP_KEY}" \
+  | jq -r '.[] | select(.tags[]? | startswith("monitor_pack:")) | .id' \
+  | while read -r id; do
+      curl -s -X DELETE "https://api.${DD_SITE}/api/v1/monitor/${id}" \
+        -H "DD-API-KEY: ${DD_API_KEY}" -H "DD-APPLICATION-KEY: ${DD_APP_KEY}" \
+        -o /dev/null -w "deleted monitor %{http_code}: ${id}\n"
+    done
+```
+
+This only ever touches monitors tagged `monitor_pack:*` — none of this workshop's own
+monitors carry that tag, so it can't catch anything of ours by accident.
 
 ## Telemetry sources (what actually produces the data below)
 
