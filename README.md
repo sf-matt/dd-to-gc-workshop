@@ -6,6 +6,11 @@ covers the **Datadog side**: the app, the Agent config, and the
 dashboard/monitors to migrate. groundcover's migrating agent + BYOC setup is
 handled separately (see the workshop invite for the pre-work guide).
 
+> **Attending the workshop?** Skip straight to
+> [**Student Setup**](observability/README.md#student-setup) — copy-paste
+> commands for both "your own Datadog trial" and "shared lab" setups. The
+> rest of this file is background for whoever's running the workshop.
+
 ## What's here
 
 ```

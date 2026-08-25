@@ -2,6 +2,142 @@
 
 This covers the Datadog side only — the piece to migrate to groundcover afterward.
 
+## Student Setup
+
+**Two paths below — pick the one your instructor told you to use, then run it top to
+bottom. Use the same commands as written; don't mix steps between the two paths.**
+
+### Prerequisites (both paths)
+
+- Docker Desktop (or another local Docker daemon), running
+- `kind`, `kubectl`, `helm`, `jq` — on macOS: `brew install kind kubectl helm jq`
+
+```bash
+git clone https://github.com/sf-matt/dd-to-gc-workshop.git
+cd dd-to-gc-workshop
+```
+
+---
+
+### Path A — Your own Datadog trial
+
+Use this if you signed up for your own free Datadog trial (14 days, no credit card —
+covers everything this workshop uses: APM, Logs, Dashboards, Monitors). You own the
+whole org, so nothing needs to be scoped to your name.
+
+**1. Get your keys.** In your trial org: **Organization Settings > API Keys** and
+**> Application Keys**.
+
+**2. Fill in your credentials:**
+
+```bash
+cp .env.example .env
+# edit .env — set DD_API_KEY, DD_APP_KEY, and DD_SITE (the domain in your browser's
+# address bar once logged in, e.g. us1.datadoghq.com, us5.datadoghq.com, datadoghq.eu)
+source .env
+```
+
+**3. Stand up the cluster and app:**
+
+```bash
+kind create cluster --config kind-config.yaml
+docker build -t order-api:local apps/order-api
+docker build -t payment-svc:local apps/payment-svc
+kind load docker-image order-api:local --name workshop
+kind load docker-image payment-svc:local --name workshop
+
+kubectl apply -f k8s/00-namespace.yaml
+helm repo add datadog https://helm.datadoghq.com
+helm repo update datadog
+helm install datadog-operator datadog/datadog-operator -n datadog
+kubectl create secret generic datadog-secret --from-literal api-key="$DD_API_KEY" -n datadog
+kubectl apply -f k8s/datadog-agent.yaml
+kubectl wait --for=condition=available --timeout=180s deployment/datadog-cluster-agent -n datadog
+
+kubectl apply -f k8s/10-payment-svc.yaml -f k8s/20-order-api.yaml -f k8s/30-load-generator.yaml
+```
+
+**4. Import the dashboards, monitors, and log pipeline into your own org:**
+
+```bash
+cd observability
+
+for f in dashboards/*.json; do
+  curl -X POST "https://api.${DD_SITE}/api/v1/dashboard" \
+    -H "DD-API-KEY: ${DD_API_KEY}" -H "DD-APPLICATION-KEY: ${DD_APP_KEY}" \
+    -H "Content-Type: application/json" -d @"$f"
+done
+
+jq -c '.[]' monitors.json | while read -r monitor; do
+  curl -X POST "https://api.${DD_SITE}/api/v1/monitor" \
+    -H "DD-API-KEY: ${DD_API_KEY}" -H "DD-APPLICATION-KEY: ${DD_APP_KEY}" \
+    -H "Content-Type: application/json" -d "$monitor"
+done
+
+curl -X POST "https://api.${DD_SITE}/api/v1/logs/config/pipelines" \
+  -H "DD-API-KEY: ${DD_API_KEY}" -H "DD-APPLICATION-KEY: ${DD_APP_KEY}" \
+  -H "Content-Type: application/json" -d @log-pipeline.json
+
+cd ..
+```
+
+**Done.** Give it a couple of minutes, then check **APM > Traces** in your Datadog org
+for `order-api` and `payment-svc` — you should see live traffic from `load-generator`.
+
+---
+
+### Path B — Shared lab (your instructor's Datadog org)
+
+Use this if your instructor invited you into *their* Datadog org and gave you a
+workshop name (e.g. `alice`) to use. You're sharing that org with everyone else in the
+workshop, so your resources have to stay scoped to your own name.
+
+**Use the exact name your instructor gave you everywhere `<your-name>` appears below —
+your dashboards/monitors only show your data if it matches exactly.**
+
+**1. Get your API key.** Either your instructor hands it to you directly, or: log into
+the shared org they invited you to, go to **Organization Settings > API Keys**, and copy
+an existing key (or create your own, if your role allows it). **You do not need an
+Application Key or an `.env` file for this path** — just the one API key.
+
+**2. Set your API key:**
+
+```bash
+export DD_API_KEY="<the key you were given>"
+```
+
+**3. Stand up your cluster and Agent:**
+
+```bash
+kind create cluster --config kind-config.yaml
+docker build -t order-api:local apps/order-api
+docker build -t payment-svc:local apps/payment-svc
+kind load docker-image order-api:local --name workshop
+kind load docker-image payment-svc:local --name workshop
+
+kubectl apply -f k8s/00-namespace.yaml
+helm repo add datadog https://helm.datadoghq.com
+helm repo update datadog
+helm install datadog-operator datadog/datadog-operator -n datadog
+kubectl create secret generic datadog-secret --from-literal api-key="$DD_API_KEY" -n datadog
+kubectl apply -f k8s/datadog-agent.yaml
+kubectl wait --for=condition=available --timeout=180s deployment/datadog-cluster-agent -n datadog
+```
+
+**4. Deploy the app tagged with your name** — this step replaces Path A's plain
+`kubectl apply -f k8s/10-payment-svc.yaml ...` with a version scoped to you:
+
+```bash
+./k8s/provision-student.sh <your-name>
+kubectl apply -f k8s/.provisioned/<your-name>/
+```
+
+**Done.** You never touch anything under `observability/` yourself in this path — your
+instructor provisions your dashboards/monitors on the Datadog side under the same
+`<your-name>`. Once traffic starts flowing, find yours in the shared org by searching
+for your name: dashboard titles end in `— <your-name>`, and your monitors are tagged
+`student:<your-name>`.
+
 ## Telemetry sources (what actually produces the data below)
 
 1. **Datadog Agent** (Operator, reusing your existing values — `DD_HOSTNAME` downward-API
@@ -95,7 +231,10 @@ root span operation name before trusting these metric names again.
   9 monitors into this same org, scoped to that student's own `env` tag. See
   "Multi-student provisioning" below.
 
-## Multi-student provisioning (many students, one shared Datadog org)
+## Multi-student provisioning (owner's side — many students, one shared Datadog org)
+
+This is the instructor/owner view of Path B in **Student Setup** above. Students run
+`k8s/provision-student.sh` themselves; this is the half you run.
 
 Every dashboard/monitor query here is scoped by an `env` tag (default `workshop`). All
 container telemetry — traces, infra metrics, *and* logs — inherits `env` from the
@@ -103,37 +242,23 @@ container telemetry — traces, infra metrics, *and* logs — inherits `env` fro
 Deployments (Datadog's Unified Service Tagging applies that label to every signal the
 Agent collects from that pod, not just APM). That single tag is what keeps one student's
 data from mixing into another's when many students each run their own Kind cluster but
-all ship into the same Datadog org.
-
-Two scripts, one for each side, that must agree on the same student name:
+all ship into the same Datadog org — which is why the two scripts (yours and theirs)
+must agree on the exact same student name.
 
 ```bash
-# Datadog side — you run this once per student, into your own org
+# You run this once per student, into your own org — matching the name they used
+# for ./k8s/provision-student.sh on their own machine (Student Setup, Path B)
 ./observability/provision-student.sh alice
-
-# k8s side — alice runs this herself, on her own machine, against her own checkout
-./k8s/provision-student.sh alice
 ```
 
-`observability/provision-student.sh` renders and `POST`s a titled, `env:workshop-alice`-
-scoped copy of every dashboard and monitor (rendered JSON + an id manifest land under
+This renders and `POST`s a titled, `env:workshop-alice`-scoped copy of every dashboard
+and monitor (rendered JSON + an id manifest land under
 `observability/.provisioned/alice/`, gitignored — keep it if you'll need the ids later
-for cleanup or `PUT` updates).
+for cleanup or `PUT` updates). Order relative to the student's own script doesn't
+matter, but their telemetry won't show up on their dashboards until both have run.
 
-`k8s/provision-student.sh` renders `k8s/10-payment-svc.yaml` and `k8s/20-order-api.yaml`
-with `tags.datadoghq.com/env` set to `workshop-alice` (both occurrences in each file —
-`metadata.labels` and `spec.template.metadata.labels`), copies the two manifests that
-don't need per-student changes (`00-namespace.yaml`, `30-load-generator.yaml`) alongside
-them, and client-side-validates the result — all under `k8s/.provisioned/alice/`, also
-gitignored, ready to `kubectl apply -f k8s/.provisioned/alice/`. It never touches a live
-cluster itself; each student runs it against their own. Order between the two scripts
-doesn't matter, but a student's telemetry won't show up on their dashboards until both
-have run — the `env` values have to match, which is why both scripts derive it from the
-same `workshop-<name>` convention rather than taking it as a free-form argument.
-
-Pass a second argument to `observability/provision-student.sh` to point a student's
-monitors at their own Slack handle instead of the shared `@slack-workshop-alerts`:
-`./provision-student.sh alice @slack-alice-alerts`.
+Pass a second argument to point a student's monitors at their own Slack handle instead
+of the shared `@slack-workshop-alerts`: `./provision-student.sh alice @slack-alice-alerts`.
 
 **What this does not give you:** Datadog's tag-based **Restriction Queries** (Data
 Access Control) can scope what each student's *own* Datadog user account can see in
@@ -189,40 +314,9 @@ deciding whether to `PUT` or `POST` each object.
 
 ## Importing
 
-All commands read `DD_API_KEY`, `DD_APP_KEY`, and `DD_SITE` from your shell —
-copy `.env.example` to `.env` at the repo root, fill in your keys, and
-`source .env` first.
-
-**Dashboards** (one POST per file, in order):
-```bash
-for f in dashboards/*.json; do
-  curl -X POST "https://api.${DD_SITE}/api/v1/dashboard" \
-    -H "DD-API-KEY: ${DD_API_KEY}" \
-    -H "DD-APPLICATION-KEY: ${DD_APP_KEY}" \
-    -H "Content-Type: application/json" \
-    -d @"$f"
-done
-```
-
-**Monitors** (loop since the endpoint takes one object at a time):
-```bash
-jq -c '.[]' monitors.json | while read -r monitor; do
-  curl -X POST "https://api.${DD_SITE}/api/v1/monitor" \
-    -H "DD-API-KEY: ${DD_API_KEY}" \
-    -H "DD-APPLICATION-KEY: ${DD_APP_KEY}" \
-    -H "Content-Type: application/json" \
-    -d "$monitor"
-done
-```
-
-**Log pipeline:**
-```bash
-curl -X POST "https://api.${DD_SITE}/api/v1/logs/config/pipelines" \
-  -H "DD-API-KEY: ${DD_API_KEY}" \
-  -H "DD-APPLICATION-KEY: ${DD_APP_KEY}" \
-  -H "Content-Type: application/json" \
-  -d @log-pipeline.json
-```
+The exact `POST` commands for dashboards, monitors, and the log pipeline are in
+**[Student Setup, Path A, step 4](#path-a--your-own-datadog-trial)** — that's the
+canonical copy; this section isn't repeating it to avoid the two drifting apart.
 
 All three also import fine via the UI (**Dashboards > New Dashboard > Import Dashboard
 JSON**, **Monitors > New Monitor > Import**, **Logs > Pipelines > New Pipeline**), or via
