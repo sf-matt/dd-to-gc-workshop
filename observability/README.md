@@ -4,10 +4,17 @@ This covers the Datadog side only — the piece to migrate to groundcover afterw
 
 ## Student Setup
 
-**Two paths below — pick the one your instructor told you to use, then run it top to
-bottom. Use the same commands as written; don't mix steps between the two paths.**
+Every student signs up for their own free Datadog trial (14 days, no credit card —
+Google sign-in works, covers everything this workshop uses: APM, Logs, Dashboards,
+Monitors) and runs this entirely on their own. Nobody needs to share a Datadog org, an
+API key, or coordinate a name with anyone else — each of you owns your whole org, so
+there's nothing to scope or collide with. Run this top to bottom.
 
-### Prerequisites (both paths)
+*(Running this as a shared lab out of one Datadog org instead — e.g. trials genuinely
+aren't an option for your group — is still possible but meaningfully more setup. See
+[Shared lab (fallback)](#shared-lab-fallback) at the bottom instead of this section.)*
+
+### Prerequisites
 
 - Docker Desktop (or another local Docker daemon), running
 - `kind`, `kubectl`, `helm`, `jq` — on macOS: `brew install kind kubectl helm jq`
@@ -17,18 +24,13 @@ git clone https://github.com/sf-matt/dd-to-gc-workshop.git
 cd dd-to-gc-workshop
 ```
 
----
+### 1. Get your keys
 
-### Path A — Your own Datadog trial
+Sign up at [datadoghq.com](https://www.datadoghq.com/free-datadog-trial/) (Google
+sign-in is the fastest path — no credit card either way). Once you're in: **Organization
+Settings > API Keys** and **> Application Keys**, create one of each.
 
-Use this if you signed up for your own free Datadog trial (14 days, no credit card —
-covers everything this workshop uses: APM, Logs, Dashboards, Monitors). You own the
-whole org, so nothing needs to be scoped to your name.
-
-**1. Get your keys.** In your trial org: **Organization Settings > API Keys** and
-**> Application Keys**.
-
-**2. Fill in your credentials:**
+### 2. Fill in your credentials
 
 ```bash
 cp .env.example .env
@@ -49,7 +51,7 @@ sed -i '' "s/site: .*/site: ${DD_SITE}/" k8s/datadog-agent.yaml   # macOS
 # sed -i "s/site: .*/site: ${DD_SITE}/" k8s/datadog-agent.yaml    # Linux
 ```
 
-**3. Stand up the cluster and app:**
+### 3. Stand up the cluster and app
 
 ```bash
 kind create cluster --config kind-config.yaml
@@ -69,7 +71,7 @@ kubectl wait --for=condition=available --timeout=180s deployment/datadog-cluster
 kubectl apply -f k8s/10-payment-svc.yaml -f k8s/20-order-api.yaml -f k8s/30-load-generator.yaml
 ```
 
-**4. Import the dashboards, monitors, and log pipeline into your own org:**
+### 4. Import the dashboards, monitors, and log pipeline into your own org
 
 ```bash
 cd observability
@@ -96,71 +98,18 @@ cd ..
 **Done.** Give it a couple of minutes, then check **APM > Traces** in your Datadog org
 for `order-api` and `payment-svc` — you should see live traffic from `load-generator`.
 
----
-
-### Path B — Shared lab (your instructor's Datadog org)
-
-Use this if your instructor invited you into *their* Datadog org. You're sharing that
-org with everyone else in the workshop, so your resources have to stay scoped to you —
-`k8s/provision-student.sh` handles that by asking for your name and tagging everything
-with it. There's no default; it won't proceed without one.
-
-**1. Get your API key.** Either your instructor hands it to you directly, or: log into
-the shared org they invited you to, go to **Organization Settings > API Keys**, and copy
-an existing key (or create your own, if your role allows it). **You do not need an
-Application Key or an `.env` file for this path** — just the one API key.
-
-**2. Set your API key:**
-
-```bash
-export DD_API_KEY="<the key you were given>"
-```
-
-**3. Stand up your cluster and Agent:**
-
-```bash
-kind create cluster --config kind-config.yaml
-docker build -t order-api:local apps/order-api
-docker build -t payment-svc:local apps/payment-svc
-kind load docker-image order-api:local --name workshop
-kind load docker-image payment-svc:local --name workshop
-
-kubectl apply -f k8s/00-namespace.yaml
-helm repo add datadog https://helm.datadoghq.com
-helm repo update datadog
-helm install datadog-operator datadog/datadog-operator -n datadog
-kubectl create secret generic datadog-secret --from-literal api-key="$DD_API_KEY" -n datadog
-kubectl apply -f k8s/datadog-agent.yaml
-kubectl wait --for=condition=available --timeout=180s deployment/datadog-cluster-agent -n datadog
-```
-
-**4. Deploy the app tagged with your name** — this step replaces Path A's plain
-`kubectl apply -f k8s/10-payment-svc.yaml ...` with a version scoped to you:
-
-```bash
-./k8s/provision-student.sh
-```
-
-With no argument it prompts — `Enter your full name:` — types what you give it into a
-clean identifier (lowercased, spaces/punctuation collapsed to hyphens — "Jane Doe"
-becomes `jane-doe`), shows you both, and asks you to confirm before doing anything. It
-won't run past that prompt with nothing typed. Once confirmed:
-
-```bash
-kubectl apply -f k8s/.provisioned/<the identifier it printed>/
-```
-
-**Then tell your instructor the exact identifier the script printed** (the line that
-says `Using identifier: ...`) — not just your name in prose. That's the string they need
-to pass to their own script for your data to line up; if they retype your name by hand
-instead and it doesn't slugify to the exact same thing (different accents, spacing,
-capitalization), your dashboards will look for data that never shows up.
-
-**Done.** You never touch anything under `observability/` yourself in this path — your
-instructor provisions your dashboards/monitors on the Datadog side using the identifier
-you send them. Once traffic starts flowing, find yours in the shared org by searching
-for your name: dashboard titles end in `— <your name as you typed it>`, and your
-monitors are tagged `student:<identifier>`.
+**One thing you'll probably see that isn't from this repo:** a fresh trial org
+auto-generates its own **Recommended Monitors** the moment Datadog notices your
+Kubernetes/APM integration data — 15-20 of them, named things like `[Kubernetes] Pod
+{{pod_name.name}} is CrashloopBackOff...` or `CPU usage is high for host {{host.name}}`,
+created by `Datadog Support`, tagged `monitor_pack:kubernetes`/`monitor_pack:host`/
+`monitor_pack:apm`. That's Datadog's own onboarding behavior, not this workshop's
+`monitors.json` — you can tell them apart by that `creator`/`monitor_pack` tag, or just
+by name (this repo's are all prefixed `[Workshop]`). The `{{...}}` in their titles isn't
+broken; it's the same multi-alert templating this repo's own monitors use, resolving to
+a real pod/host name only once that specific one fires. Harmless to leave, or delete
+them (**Monitors > search `monitor_pack:*` > Delete**) if you want a clean, workshop-only
+view before you start comparing against groundcover.
 
 ## Telemetry sources (what actually produces the data below)
 
@@ -251,14 +200,81 @@ root span operation name before trusting these metric names again.
   you'll recreate as groundcover alerts for the parity check.
 - `log-pipeline.json` — a Datadog log processing pipeline (grok parser + status remapper)
   that fixes the log-severity bug described below. Pure Datadog-side config, no app code.
-- `provision-student.sh` — renders + imports a per-student copy of all 5 dashboards and
-  9 monitors into this same org, scoped to that student's own `env` tag. See
-  "Multi-student provisioning" below.
+- `provision-student.sh` — fallback tool, only needed for the shared-lab setup (see
+  below) — renders + imports a per-student copy of all 5 dashboards and 9 monitors into
+  a shared org, scoped to that student's own `env` tag. Not used when every student has
+  their own trial (the default — see **Student Setup** above).
 
-## Multi-student provisioning (owner's side — many students, one shared Datadog org)
+## Shared lab (fallback)
 
-This is the instructor/owner view of Path B in **Student Setup** above. Students run
-`k8s/provision-student.sh` themselves; this is the half you run.
+Many students, one shared Datadog org, instead of each student on their own trial.
+Skip this whole section if every student can get their own trial (the default — see
+**Student Setup** at the top). Use this instead only when that's genuinely not an
+option — e.g. trial signups are blocked for your group. It's real setup work: students
+share one org, so their resources have to stay scoped to them individually, and that
+scoping has to be coordinated by hand between you and each student.
+
+### Student side
+
+Same **Prerequisites** and `git clone` as Student Setup above, then:
+
+**1. Get your API key.** Either your instructor hands it to you directly, or: log into
+the shared org they invited you to, go to **Organization Settings > API Keys**, and copy
+an existing key (or create your own, if your role allows it). **You do not need an
+Application Key or an `.env` file for this path** — just the one API key.
+
+```bash
+export DD_API_KEY="<the key you were given>"
+```
+
+**2. Stand up your cluster and Agent** — identical to Student Setup step 3, except the
+secret uses the key above instead of one from `.env`:
+
+```bash
+kind create cluster --config kind-config.yaml
+docker build -t order-api:local apps/order-api
+docker build -t payment-svc:local apps/payment-svc
+kind load docker-image order-api:local --name workshop
+kind load docker-image payment-svc:local --name workshop
+
+kubectl apply -f k8s/00-namespace.yaml
+helm repo add datadog https://helm.datadoghq.com
+helm repo update datadog
+helm install datadog-operator datadog/datadog-operator -n datadog
+kubectl create secret generic datadog-secret --from-literal api-key="$DD_API_KEY" -n datadog
+kubectl apply -f k8s/datadog-agent.yaml
+kubectl wait --for=condition=available --timeout=180s deployment/datadog-cluster-agent -n datadog
+```
+
+**3. Deploy the app tagged with your name** — this replaces Student Setup step 3's plain
+`kubectl apply -f k8s/10-payment-svc.yaml ...` with a version scoped to you:
+
+```bash
+./k8s/provision-student.sh
+```
+
+With no argument it prompts — `Enter your full name:` — and turns whatever you type into
+a clean identifier (lowercased, spaces/punctuation collapsed to hyphens — "Jane Doe"
+becomes `jane-doe`), shows you both, and asks you to confirm before doing anything. It
+won't run past that prompt with nothing typed. Once confirmed:
+
+```bash
+kubectl apply -f k8s/.provisioned/<the identifier it printed>/
+```
+
+**Then tell your instructor the exact identifier the script printed** (the line that
+says `Using identifier: ...`) — not just your name in prose. That's the string they need
+to pass to their own script for your data to line up; if they retype your name by hand
+instead and it doesn't slugify to the exact same thing (different accents, spacing,
+capitalization), your dashboards will look for data that never shows up.
+
+You never touch anything under `observability/` yourself in this path — your instructor
+provisions your dashboards/monitors using the identifier you send them. Once traffic
+starts flowing, find yours in the shared org by searching for your name: dashboard
+titles end in `— <your name as you typed it>`, and your monitors are tagged
+`student:<identifier>`.
+
+### Instructor side
 
 Every dashboard/monitor query here is scoped by an `env` tag (default `workshop`). All
 container telemetry — traces, infra metrics, *and* logs — inherits `env` from the
@@ -353,8 +369,8 @@ deciding whether to `PUT` or `POST` each object.
 ## Importing
 
 The exact `POST` commands for dashboards, monitors, and the log pipeline are in
-**[Student Setup, Path A, step 4](#path-a--your-own-datadog-trial)** — that's the
-canonical copy; this section isn't repeating it to avoid the two drifting apart.
+**[Student Setup, step 4](#4-import-the-dashboards-monitors-and-log-pipeline-into-your-own-org)**
+— that's the canonical copy; this section isn't repeating it to avoid the two drifting apart.
 
 All three also import fine via the UI (**Dashboards > New Dashboard > Import Dashboard
 JSON**, **Monitors > New Monitor > Import**, **Logs > Pipelines > New Pipeline**), or via

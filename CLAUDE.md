@@ -20,12 +20,15 @@ not in-app).
   dashboard/monitor/log-pipeline definitions, importable via API or UI. These
   are the "before" state that gets rebuilt in groundcover during the
   workshop's migration half.
-- `k8s/provision-student.sh` + `observability/provision-student.sh` — for
-  running this workshop with many students inside one shared Datadog org.
-  Both derive an `env:workshop-<name>` tag from the same student name, one
-  scoping the app manifests' `tags.datadoghq.com/env` label, the other
-  scoping a per-student copy of every dashboard/monitor. Keep them in sync if
-  the env-tagging convention ever changes on either side.
+- `k8s/provision-student.sh` + `observability/provision-student.sh` —
+  **fallback only**, for running this workshop with many students inside one
+  shared Datadog org. The default is every student on their own free trial
+  (no shared org, no scripts needed — see `observability/README.md`'s
+  Student Setup); these exist for when that's not an option. Both derive an
+  `env:workshop-<name>` tag from the same student name, one scoping the app
+  manifests' `tags.datadoghq.com/env` label, the other scoping a per-student
+  copy of every dashboard/monitor. Keep them in sync if the env-tagging
+  convention ever changes on either side.
 
 ## Conventions to preserve when iterating
 
