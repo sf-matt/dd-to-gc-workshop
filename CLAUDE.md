@@ -20,6 +20,12 @@ not in-app).
   dashboard/monitor/log-pipeline definitions, importable via API or UI. These
   are the "before" state that gets rebuilt in groundcover during the
   workshop's migration half.
+- `groundcover/README.md` — the migration side: dual-shipping from the
+  Datadog Agent, sensor install, dashboard/monitor parity rebuild. Filled in
+  incrementally as each piece is verified against a real cluster, same
+  standard as `observability/` — don't treat unverified sections as tested
+  just because they're written down; check the file for what's actually
+  been confirmed vs. sourced-but-untested.
 - `k8s/provision-student.sh` + `observability/provision-student.sh` —
   **fallback only**, for running this workshop with many students inside one
   shared Datadog org. The default is every student on their own free trial
@@ -33,9 +39,15 @@ not in-app).
 ## Conventions to preserve when iterating
 
 - Both services stay framework-vanilla Flask — no `ddtrace` or OTel SDK
-  imports added directly to `app.py` unless we're deliberately testing the
-  "dual-ship custom telemetry" stretch scenario (see prior workshop planning
-  notes) — that's the one case where SDK instrumentation is intentional.
+  imports added directly to `app.py` unless we're deliberately testing a
+  custom-telemetry stretch scenario — that's the one case where SDK
+  instrumentation is intentional. Note this is narrower than it used to be:
+  dual-shipping traces/APM metrics/DogStatsD from Datadog to groundcover
+  (`groundcover/README.md`) turned out to be pure Agent-level config
+  (`DD_APM_ADDITIONAL_ENDPOINTS`/`DD_ADDITIONAL_ENDPOINTS` on the
+  `DatadogAgent` CR) — zero app code, fully consistent with "agentless."
+  SDK instrumentation is only the answer for telemetry SSI/eBPF can't
+  capture at all, not for dual-shipping what they already do capture.
 - `payment-svc`'s chaos state is in-memory and single-replica on purpose —
   don't add persistence or multi-replica support without discussing first,
   since that changes the live-demo mechanics.

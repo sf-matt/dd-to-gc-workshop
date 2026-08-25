@@ -1,10 +1,11 @@
 # Datadog → groundcover Migration Workshop
 
 A deliberately small two-service app used to demonstrate migrating a live
-Kubernetes workload from Datadog to groundcover in one sitting. This repo
-covers the **Datadog side**: the app, the Agent config, and the
-dashboard/monitors to migrate. groundcover's migrating agent + BYOC setup is
-handled separately (see the workshop invite for the pre-work guide).
+Kubernetes workload from Datadog to groundcover in one sitting. `observability/`
+covers the Datadog side: the app, the Agent config, and the dashboards/monitors
+to migrate. `groundcover/` covers the migration itself — dual-shipping,
+sensor install, and rebuilding the same dashboards/monitors in groundcover —
+and is filled in as each piece gets verified.
 
 > **Attending the workshop?** Skip straight to
 > [**Student Setup**](observability/README.md#student-setup) — copy-paste
@@ -30,6 +31,8 @@ observability/
   log-pipeline.json       # log processing pipeline (HTTP status -> log severity)
   provision-student.sh    # renders + imports a per-student copy of the above
   README.md               # what backs each widget/monitor, and why
+groundcover/
+  README.md               # the migration itself: dual-shipping, sensor, dashboard/monitor parity
 ```
 
 ## Why it's shaped this way
@@ -92,7 +95,10 @@ kubectl apply -f k8s/00-namespace.yaml -f k8s/10-payment-svc.yaml \
   -f k8s/20-order-api.yaml -f k8s/30-load-generator.yaml
 ```
 
-## Next: observability
+## Next
 
-See `observability/README.md` for the dashboard/monitor import steps and the
-exact metrics backing each widget.
+- `observability/README.md` — dashboard/monitor import steps and the exact
+  metrics backing each widget (the Datadog "before" state).
+- `groundcover/README.md` — the migration itself: dual-shipping from the
+  Datadog Agent, sensor install, and rebuilding the same dashboards/monitors
+  in groundcover for the parity comparison.
