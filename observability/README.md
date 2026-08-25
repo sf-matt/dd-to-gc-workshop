@@ -88,12 +88,10 @@ for `order-api` and `payment-svc` — you should see live traffic from `load-gen
 
 ### Path B — Shared lab (your instructor's Datadog org)
 
-Use this if your instructor invited you into *their* Datadog org and gave you a
-workshop name (e.g. `alice`) to use. You're sharing that org with everyone else in the
-workshop, so your resources have to stay scoped to your own name.
-
-**Use the exact name your instructor gave you everywhere `<your-name>` appears below —
-your dashboards/monitors only show your data if it matches exactly.**
+Use this if your instructor invited you into *their* Datadog org. You're sharing that
+org with everyone else in the workshop, so your resources have to stay scoped to you —
+`k8s/provision-student.sh` handles that by asking for your name and tagging everything
+with it. There's no default; it won't proceed without one.
 
 **1. Get your API key.** Either your instructor hands it to you directly, or: log into
 the shared org they invited you to, go to **Organization Settings > API Keys**, and copy
@@ -128,15 +126,29 @@ kubectl wait --for=condition=available --timeout=180s deployment/datadog-cluster
 `kubectl apply -f k8s/10-payment-svc.yaml ...` with a version scoped to you:
 
 ```bash
-./k8s/provision-student.sh <your-name>
-kubectl apply -f k8s/.provisioned/<your-name>/
+./k8s/provision-student.sh
 ```
 
+With no argument it prompts — `Enter your full name:` — types what you give it into a
+clean identifier (lowercased, spaces/punctuation collapsed to hyphens — "Jane Doe"
+becomes `jane-doe`), shows you both, and asks you to confirm before doing anything. It
+won't run past that prompt with nothing typed. Once confirmed:
+
+```bash
+kubectl apply -f k8s/.provisioned/<the identifier it printed>/
+```
+
+**Then tell your instructor the exact identifier the script printed** (the line that
+says `Using identifier: ...`) — not just your name in prose. That's the string they need
+to pass to their own script for your data to line up; if they retype your name by hand
+instead and it doesn't slugify to the exact same thing (different accents, spacing,
+capitalization), your dashboards will look for data that never shows up.
+
 **Done.** You never touch anything under `observability/` yourself in this path — your
-instructor provisions your dashboards/monitors on the Datadog side under the same
-`<your-name>`. Once traffic starts flowing, find yours in the shared org by searching
-for your name: dashboard titles end in `— <your-name>`, and your monitors are tagged
-`student:<your-name>`.
+instructor provisions your dashboards/monitors on the Datadog side using the identifier
+you send them. Once traffic starts flowing, find yours in the shared org by searching
+for your name: dashboard titles end in `— <your name as you typed it>`, and your
+monitors are tagged `student:<identifier>`.
 
 ## Telemetry sources (what actually produces the data below)
 
@@ -246,19 +258,33 @@ all ship into the same Datadog org — which is why the two scripts (yours and t
 must agree on the exact same student name.
 
 ```bash
-# You run this once per student, into your own org — matching the name they used
-# for ./k8s/provision-student.sh on their own machine (Student Setup, Path B)
-./observability/provision-student.sh alice
+# Run once per student, using the exact identifier they sent you (the line their
+# own script printed as "Using identifier: ..."), NOT their name retyped by hand —
+# a re-typed name only matches if it slugifies to byte-for-byte the same string.
+./observability/provision-student.sh jane-doe
 ```
 
-This renders and `POST`s a titled, `env:workshop-alice`-scoped copy of every dashboard
-and monitor (rendered JSON + an id manifest land under
-`observability/.provisioned/alice/`, gitignored — keep it if you'll need the ids later
-for cleanup or `PUT` updates). Order relative to the student's own script doesn't
+Passing an already-slugified identifier like that works cleanly — `slugify()` is
+idempotent on its own output, so `jane-doe` in gives `jane-doe` out. If you'd rather
+type the student's actual name for a nicer-looking dashboard title, that's also fine —
+just confirm the printed `Using identifier: ...` line matches what they gave you before
+moving on, since that's the value that actually has to agree with their side.
+
+This renders and `POST`s a titled, `env:workshop-jane-doe`-scoped copy of every
+dashboard and monitor (rendered JSON + an id manifest land under
+`observability/.provisioned/jane-doe/`, gitignored — keep it if you'll need the ids
+later for cleanup or `PUT` updates). Order relative to the student's own script doesn't
 matter, but their telemetry won't show up on their dashboards until both have run.
 
 Pass a second argument to point a student's monitors at their own Slack handle instead
-of the shared `@slack-workshop-alerts`: `./provision-student.sh alice @slack-alice-alerts`.
+of the shared `@slack-workshop-alerts`: `./provision-student.sh jane-doe @slack-jane-alerts`.
+
+**Nothing stops you from provisioning the same identifier twice** — there's no
+collision check against past runs (same session, different day, different cohort). A
+second run with the same slug creates a second full set of dashboards/monitors with the
+identical title and, worse, the identical `env` tag as the first — meaning two different
+students' telemetry would show up mixed together on shared queries. Keep track of who
+you've provisioned; the script won't catch a repeat for you.
 
 **What this does not give you:** Datadog's tag-based **Restriction Queries** (Data
 Access Control) can scope what each student's *own* Datadog user account can see in
