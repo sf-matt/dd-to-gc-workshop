@@ -35,6 +35,12 @@ not in-app).
   manifests' `tags.datadoghq.com/env` label, the other scoping a per-student
   copy of every dashboard/monitor. Keep them in sync if the env-tagging
   convention ever changes on either side.
+- `scripts/chaos-load-test.sh` — cycles `payment-svc` through
+  baseline/latency/errors/both/recovery automatically, relying on
+  `load-generator`'s existing traffic rather than generating its own. For
+  populating dashboards/triggering monitors unattended; the manual
+  single-shot `curl` version (for live-narrated demos) stays documented
+  directly in the root README.
 
 ## Conventions to preserve when iterating
 

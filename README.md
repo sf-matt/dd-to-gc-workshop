@@ -32,7 +32,10 @@ observability/
   provision-student.sh    # renders + imports a per-student copy of the above
   README.md               # what backs each widget/monitor, and why
 groundcover/
-  README.md               # the migration itself: dual-shipping, sensor, dashboard/monitor parity
+  README.md               # the migration itself: sensor install, dual-shipping, dashboard/monitor parity
+  values.yaml             # sensor-only Helm values (token injected from .env at install time)
+scripts/
+  chaos-load-test.sh      # cycles payment-svc through baseline/latency/errors/both/recovery
 ```
 
 ## Why it's shaped this way
@@ -58,6 +61,8 @@ apart the way they already did once this session.
 
 ## Running the chaos demo
 
+For a single live moment (narrating in front of a room):
+
 ```bash
 kubectl port-forward -n workshop svc/payment-svc 5000:5000
 
@@ -71,6 +76,20 @@ curl -X POST http://localhost:5000/chaos \
   -H 'Content-Type: application/json' \
   -d '{"latency_ms": 0, "error_rate": 0.0}'
 ```
+
+For generating a full spread of data unattended (populating dashboards/monitors before a
+demo, or testing that alerts actually fire — this is scripted version of exactly the
+manual steps above, cycled through baseline/latency/errors/both/recovery automatically):
+
+```bash
+./scripts/chaos-load-test.sh
+# PHASE_SECONDS=360 ./scripts/chaos-load-test.sh   # 300s+ recommended so 5-minute
+                                                    # rolling-window monitors have
+                                                    # time to actually cross threshold
+```
+
+Safe to `Ctrl-C` at any point — always reverts chaos to baseline on exit, so you can't
+walk away and leave it running.
 
 Watch the Latency and Error Rate widgets on the imported dashboard react
 within a minute — that's the same moment you'll reproduce in groundcover
