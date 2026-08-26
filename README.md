@@ -86,8 +86,8 @@ kind delete cluster --name workshop
 ```
 
 then re-run [Student Setup](observability/README.md#student-setup) from the top. For a
-lighter reset that keeps the
-Agent/groundcover installed and only resets the app:
+lighter reset that keeps the Datadog Agent (and groundcover's sensor, if you've also
+installed it — see `groundcover/README.md`) and only resets the app:
 
 ```bash
 kubectl delete namespace workshop
