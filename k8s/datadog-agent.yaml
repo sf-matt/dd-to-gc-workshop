@@ -24,6 +24,17 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: spec.nodeName
+        # Dual-ship traces/APM metrics + DogStatsD custom metrics to groundcover
+        # alongside Datadog — see groundcover/README.md's "Dual-shipping from
+        # the Datadog Agent" section. Requires the groundcover sensor already
+        # deployed (namespace/service name below assumes its default install).
+        # GROUNDCOVER_TOKEN_PLACEHOLDER is not a real value — apply this file via
+        # groundcover/README.md's sed command, which substitutes in the real
+        # token from .env's GROUNDCOVER_TOKEN. Never hardcode the real token here.
+        - name: DD_APM_ADDITIONAL_ENDPOINTS
+          value: '{"http://groundcover-sensor.groundcover.svc.cluster.local:8126": ["GROUNDCOVER_TOKEN_PLACEHOLDER"]}'
+        - name: DD_ADDITIONAL_ENDPOINTS
+          value: '{"http://groundcover-sensor.groundcover.svc.cluster.local:8126/datadog": ["GROUNDCOVER_TOKEN_PLACEHOLDER"]}'
   features:
     apm:
       enabled: true

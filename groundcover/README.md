@@ -53,11 +53,13 @@ organizes clusters in groundcover's Cluster Picker UI if set. Neither blocks a f
 install if left out; they're set explicitly here for a predictable, findable name instead
 of whatever auto-detection would have picked.
 
-**Not yet empirically tested against a real cluster in this repo** — same caveat as
-dual-shipping below: this is sourced directly from groundcover's own install docs, not
-verified live here the way the Datadog-side setup was. The values file matches exactly
-what was provided for this workshop's sensor-only setup, but the full install hasn't
-been run end-to-end yet.
+**Confirmed working**: this exact command (`values.yaml` + `.env`-sourced token) has been
+run against this workshop's Kind cluster — `kubectl get pods -n groundcover` shows the
+sensor DaemonSet, Vector, kube-state-metrics, and metrics-ingester all healthy, and the
+sensor's own logs show eBPF probes attaching successfully and profile uploads to
+groundcover succeeding. See the caveat in **Dual-shipping**'s step 3 below, though: sensor
+health doesn't by itself confirm this workshop's telemetry is actually *findable* on the
+groundcover side under the expected `clusterId` — that part is still open.
 
 Sources:
 - [Connect Kubernetes clusters — groundcover docs](https://docs.groundcover.com/getting-started/installation-and-updating/connect-kubernetes-cluster)
@@ -82,10 +84,7 @@ mentions traces, APM metrics, and custom metrics — there's no equivalent
 `DD_LOGS_CONFIG_ADDITIONAL_ENDPOINTS` step documented, so don't assume logs are dual-shipping
 just because this is configured.
 
-### 1. Add the additional-endpoints env vars
-
-Edit `k8s/datadog-agent.yaml` — add these two entries to the existing
-`spec.override.nodeAgent.env` list, alongside the existing `DD_HOSTNAME` entry:
+### 1. The additional-endpoints env vars are already in `k8s/datadog-agent.yaml`
 
 ```yaml
   override:
@@ -96,26 +95,38 @@ Edit `k8s/datadog-agent.yaml` — add these two entries to the existing
             fieldRef:
               fieldPath: spec.nodeName
         - name: DD_APM_ADDITIONAL_ENDPOINTS
-          value: '{"http://groundcover-sensor.groundcover.svc.cluster.local:8126": ["groundcover-nokeyneeded"]}'
+          value: '{"http://groundcover-sensor.groundcover.svc.cluster.local:8126": ["GROUNDCOVER_TOKEN_PLACEHOLDER"]}'
         - name: DD_ADDITIONAL_ENDPOINTS
-          value: '{"http://groundcover-sensor.groundcover.svc.cluster.local:8126/datadog": ["groundcover-nokeyneeded"]}'
+          value: '{"http://groundcover-sensor.groundcover.svc.cluster.local:8126/datadog": ["GROUNDCOVER_TOKEN_PLACEHOLDER"]}'
 ```
 
-Two things to get exactly right:
+`GROUNDCOVER_TOKEN_PLACEHOLDER` is not a real value — it's substituted with the real
+ingestion token from `.env`'s `GROUNDCOVER_TOKEN` at apply time (step 2), the same
+`.env`-sourced pattern as everything else in this repo. **Never replace it directly in
+the committed file** — that would put a real credential in git.
+
+Two things to get exactly right if you're changing this by hand:
 - **The `/datadog` suffix is only on `DD_ADDITIONAL_ENDPOINTS`** (the metrics one) — not on
   `DD_APM_ADDITIONAL_ENDPOINTS` (traces). Different paths on the same receiver.
-- **`"groundcover-nokeyneeded"` is literal**, not a placeholder to replace — groundcover's
-  receiver doesn't check it, but the field can't be empty.
+- The `groundcover-sensor.groundcover.svc.cluster.local` hostname assumes groundcover was
+  installed with its default Helm release/namespace (`groundcover`). If yours differs,
+  swap in the actual `<service>.<namespace>.svc.cluster.local` for your install.
 
-The `groundcover-sensor.groundcover.svc.cluster.local` hostname assumes groundcover was
-installed with its default Helm release/namespace (`groundcover`). If yours differs,
-swap in the actual `<service>.<namespace>.svc.cluster.local` for your install.
+(groundcover's own Kubernetes-environment docs for this path say the ingestion key isn't
+actually checked by the sensor's receiver — a literal placeholder string works. This
+workshop uses the real token anyway, since it costs nothing and matches how every other
+credential here is handled — never a hardcoded placeholder sitting in committed YAML.)
 
 ### 2. Apply it
 
 ```bash
-kubectl apply -f k8s/datadog-agent.yaml
+source .env   # needs GROUNDCOVER_TOKEN set
+sed "s/GROUNDCOVER_TOKEN_PLACEHOLDER/${GROUNDCOVER_TOKEN}/g" k8s/datadog-agent.yaml | kubectl apply -f -
 ```
+
+Same substitute-before-apply pattern as the `site:` fix in `observability/README.md` —
+the real token only ever exists in your shell's environment and in the live cluster,
+never written to a file that could end up in git.
 
 The Datadog Operator reconciles the `DatadogAgent` CR and rolls the `datadog-agent`
 DaemonSet automatically on spec changes — no separate `rollout restart` needed (verified
@@ -124,15 +135,22 @@ automatic rollout without any extra command).
 
 ### 3. Verify
 
-Once the sensor's up and this is applied, the same `order-api`/`payment-svc` traces this
-workshop already generates should show up on both sides simultaneously — check APM in
-Datadog as usual, and look for the same services in groundcover. This hasn't been tested
-against a real cluster yet in this repo — the config is sourced directly from groundcover's
-own docs (linked below), not empirically verified here the way the rest of this workshop's
-Datadog-side config was. Treat it as a documented starting point, not a proven one, until
-someone runs it against a live sensor.
+**Confirmed working on the Agent side**: applying this rolls a fresh `datadog-agent` pod
+cleanly (`3/3` ready), the real token lands in its environment, and neither the core
+agent nor trace-agent log any groundcover-related errors — dual-shipping is configured
+and sending without complaint.
 
-Sources:
+**Not yet confirmed on the receiving side.** Looking for the actual `order-api`/
+`payment-svc` data in groundcover hit a real, unresolved mystery: querying the
+`experiments` tenant for `clusterId: matt_workshop` (the value this workshop's
+`groundcover/values.yaml` sets, confirmed applied via `helm get values`) returns nothing,
+even several minutes after the sensor came up healthy. The only cluster names visible in
+that tenant don't match this Kind cluster's actual workloads. So: the Agent believes
+it's shipping successfully, but end-to-end proof that groundcover received and stored
+that data is still open. Don't treat this as confirmed working until someone resolves
+that and actually finds the data on the groundcover side.
+
+Sources for the config itself (not the open receiving-side question above):
 - [Shipping from the DataDog Agent — groundcover docs](https://docs.groundcover.com/integrations/data-sources/datadog/shipping-from-the-datadog-agent)
 - [Sending Directly from Instrumented Services — groundcover docs](https://docs.groundcover.com/integrations/data-sources/datadog/sending-directly-from-instrumented-services)
 - [Dual Shipping — Datadog docs](https://docs.datadoghq.com/agent/configuration/dual-shipping/)
