@@ -1,0 +1,11 @@
+# groundcover sensor-only Helm values. Safe to commit — groundcover_token stays
+# empty here and is injected at install time from .env, same pattern as
+# DD_API_KEY elsewhere in this repo. Never put a real token in this file.
+global:
+  groundcover_token: ""
+  ingress:
+    site: ik4392ove.platform.grcv.io
+  backend:
+    enabled: false
+clusterId: matt_workshop
+env: "dev"
